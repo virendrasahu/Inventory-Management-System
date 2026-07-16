@@ -1,126 +1,175 @@
-# Inventory Management System (FIFO)
+# 📦 Inventory Management System (FIFO)
 
-A fully working **Inventory Management System** for a small trading business that uses the **FIFO (First-In, First-Out)** costing method. The application processes purchase and sale events through **Apache Kafka**, stores inventory in **PostgreSQL**, and provides a **real-time React dashboard** to monitor inventory, transaction history, and costing.
+A production-ready **Inventory Management System** built for a small trading business using the **FIFO (First-In, First-Out)** inventory costing method. The application processes purchase and sale events through **Apache Kafka**, stores inventory in **PostgreSQL**, and provides a responsive **React Dashboard** for monitoring inventory, transaction history, and stock valuation.
 
 ---
 
-## 🚀 Features
+## 🚀 Live Demo
 
-- 🔐 JWT Authentication (Sign In / Sign Up)
-- 👤 Personalized Dashboard Header (Displays Logged-in User)
-- 📦 FIFO Inventory Cost Calculation
-- ⚡ Real-Time Kafka Event Processing
-- 📊 Live Inventory Dashboard
+### Frontend
+[https://inventory-management-system-ebon-beta.vercel.app/](https://inventory-management-system-ebon-beta.vercel.app/)
+
+### Backend API
+[https://inventory-management-system-191s.onrender.com](https://inventory-management-system-191s.onrender.com)
+
+### Health Check
+https://YOUR-BACKEND-URL/health
+
+---
+
+## 📂 GitHub Repository
+
+https://github.com/YOUR_USERNAME/YOUR_REPOSITORY
+
+---
+
+# ✨ Features
+
+- 🔐 JWT Authentication (Sign Up / Sign In)
+- 👤 Personalized Dashboard (Displays Logged-in User)
+- 📦 FIFO Inventory Costing Algorithm
+- ⚡ Apache Kafka Event Processing
+- 📊 Real-Time Inventory Dashboard
 - 📜 Transaction Ledger
-- 🧾 FIFO Audit Trail (`sale_batch_details`)
-- 📈 Product Stock Overview
-- 💰 Average Cost & Inventory Value Calculation
-- 🔄 Kafka Event Simulator
-- 🛡️ Protected Routes using JWT Authentication
-- 📱 Responsive UI
+- 🧾 FIFO Audit Trail
+- 📈 Stock Overview
+- 💰 Inventory Value Calculation
+- 🔄 Simulate Inventory Events
+- 🛡️ Protected REST APIs
+- 📱 Fully Responsive UI
 - 🏗️ Modular Backend Architecture
 
 ---
 
-## 🛠️ Tech Stack
+# 🛠️ Tech Stack
 
-### Frontend
+## Frontend
+
 - React (Vite)
 - Tailwind CSS
 - React Router
 - Axios
 
-### Backend
+## Backend
+
 - Node.js
 - Express.js
 
-### Database
+## Database
+
 - PostgreSQL (Neon)
 
-### Messaging
-- Apache Kafka (Aiven / Confluent / Redpanda)
+## Messaging
 
-### Authentication
+- Apache Kafka
+
+## Authentication
+
 - JWT
 - bcrypt
 
----
+## Deployment
 
-## 🏗️ Project Architecture
-
-This project follows a modular, production-ready architecture.
-
-- **Controllers** → Handle HTTP requests & responses
-- **Services** → Business logic (FIFO costing)
-- **Repositories** → Database access layer
-- **Middlewares** → JWT Authentication, Validation & Error Handling
-- **Kafka Producer** → Publishes inventory events
-- **Kafka Consumer** → Processes purchase/sale events asynchronously
-- **PostgreSQL** → Stores inventory, sales, users & audit records
+- Vercel (Frontend)
+- Render (Backend)
 
 ---
 
-## 📁 Project Structure
+# 🏗️ Architecture
 
-```text
+```
+React Frontend
+        │
+        ▼
+Express REST API
+        │
+        ▼
+JWT Authentication
+        │
+        ▼
+Kafka Producer
+        │
+        ▼
+Kafka Topic
+        │
+        ▼
+Kafka Consumer
+        │
+        ▼
+PostgreSQL Database
+        │
+        ▼
+Inventory Dashboard
+```
+
+---
+
+# 📁 Project Structure
+
+```
 inventory-management-system/
-│
+
 ├── backend/
-│   ├── controllers/
-│   ├── services/
-│   ├── repositories/
-│   ├── routes/
-│   ├── middlewares/
-│   ├── kafka/
-│   ├── migrations/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── services/
+│   │   ├── repositories/
+│   │   ├── routes/
+│   │   ├── validators/
+│   │   ├── middlewares/
+│   │   ├── kafka/
+│   │   └── utils/
 │   ├── setup.sql
-│   └── server.js
+│   ├── server.js
+│   └── package.json
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── assets/
 │   │   ├── components/
-│   │   ├── pages/
 │   │   ├── context/
+│   │   ├── pages/
 │   │   ├── services/
 │   │   └── App.jsx
+│   ├── package.json
+│   └── vite.config.js
 │
 └── README.md
 ```
 
 ---
 
-# 📦 FIFO Costing Logic
+# 📦 FIFO Inventory Logic
 
-The application uses the **First-In, First-Out (FIFO)** inventory costing method.
+## Purchase
 
-### Purchase Event
+- Creates a new inventory batch
+- Stores purchase quantity
+- Stores unit price
+- Stores purchase timestamp
 
-- Creates a new inventory batch.
-- Stores quantity, unit price, and purchase timestamp.
+## Sale
 
-### Sale Event
-
-- Fetches the oldest available inventory batches.
-- Consumes stock from the oldest batch first.
-- Calculates the sale cost using FIFO.
-- Updates remaining inventory.
-- Stores an audit trail in the `sale_batch_details` table.
+- Reads the oldest inventory batch first
+- Deducts stock using FIFO
+- Calculates inventory cost
+- Updates remaining stock
+- Stores complete audit trail
 
 ### Example
 
-Purchase:
-
-| Batch | Qty | Price |
-|------|----:|------:|
+| Batch | Quantity | Price |
+|--------|---------:|------:|
 | Batch A | 50 | ₹100 |
 | Batch B | 30 | ₹120 |
 
-Sale:
+Sale Quantity
 
+```
 60 Units
+```
 
-FIFO Cost:
+FIFO Cost
 
 ```
 50 × 100 = 5000
@@ -130,31 +179,30 @@ FIFO Cost:
 Total Cost = ₹6200
 ```
 
-### Concurrency
-
-To prevent race conditions, inventory batches are fetched using:
+Database locking uses
 
 ```
 FOR UPDATE
 ```
 
-ensuring safe concurrent inventory updates.
+to safely process concurrent inventory transactions.
 
 ---
 
 # 🔐 Authentication
 
-The application includes JWT-based authentication.
+The application uses JWT Authentication.
 
-Features:
+Features
 
 - User Registration
 - User Login
 - Password Hashing using bcrypt
+- JWT Token Generation
 - Protected Dashboard
-- JWT Authentication
+- Protected APIs
 - Logout
-- Personalized Dashboard Header
+- Personalized Welcome Header
 
 ---
 
@@ -165,38 +213,11 @@ Features:
 - inventory_batches
 - sales
 - sale_batch_details
+- transaction_ledger (View)
 
 ---
 
 # 📡 API Endpoints
-
-## Authentication
-
-```
-POST /api/auth/register
-```
-
-```
-POST /api/auth/login
-```
-
----
-
-## Inventory
-
-```
-GET /api/products
-```
-
-```
-GET /api/transactions
-```
-
-```
-POST /api/events/simulate
-```
-
----
 
 ## Health Check
 
@@ -206,9 +227,33 @@ GET /health
 
 ---
 
+## Authentication
+
+```
+POST /api/auth/register
+
+POST /api/auth/login
+```
+
+---
+
+## Inventory APIs
+
+```
+GET /api/stock
+
+GET /api/ledger
+
+POST /api/event
+
+POST /api/simulate
+```
+
+---
+
 # ⚙️ Environment Variables
 
-Create a `.env` file inside the `backend` directory.
+Create a `.env` file inside the backend folder.
 
 ```env
 DATABASE_URL=postgres://user:password@hostname/dbname?sslmode=require
@@ -217,7 +262,7 @@ PORT=3001
 
 JWT_SECRET=your_jwt_secret
 
-KAFKA_BROKERS=your-kafka-broker
+KAFKA_BROKERS=your_kafka_broker
 
 KAFKA_SSL=true
 
@@ -227,56 +272,42 @@ KAFKA_SSL_CERT_PATH=./service.cert
 
 KAFKA_SSL_KEY_PATH=./service.key
 
-# Optional SASL
-
 KAFKA_SASL_MECHANISM=scram-sha-256
 
-KAFKA_USERNAME=your-username
+KAFKA_USERNAME=your_username
 
-KAFKA_PASSWORD=your-password
+KAFKA_PASSWORD=your_password
 ```
 
 ---
 
 # 💻 Local Setup
 
-## 1. Clone Repository
+## Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/inventory-management-system.git
+git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
 
 cd inventory-management-system
 ```
 
 ---
 
-## 2. Backend Setup
+## Backend
 
 ```bash
 cd backend
 
 npm install
-```
 
-Run database migrations
-
-```bash
 npm run migrate
-```
 
-Seed admin user
-
-```bash
 npm run seed
-```
 
-Start API + Kafka Consumer
-
-```bash
 npm run dev:all
 ```
 
-Verify API
+Health Check
 
 ```
 http://localhost:3001/health
@@ -284,7 +315,7 @@ http://localhost:3001/health
 
 ---
 
-## 3. Frontend Setup
+## Frontend
 
 ```bash
 cd frontend
@@ -304,26 +335,26 @@ http://localhost:5173
 
 # 🚀 How to Use
 
-1. Open the application.
-2. Register a new account or log in using the demo credentials.
-3. Access the Inventory Dashboard.
+1. Register a new account or login.
+2. Open the Inventory Dashboard.
+3. View inventory overview.
 4. Click **Simulate Events**.
 5. Kafka publishes inventory events.
-6. Consumer processes purchase/sale events.
+6. Kafka Consumer processes purchase and sale events.
 7. FIFO costing updates inventory.
-8. Dashboard automatically refreshes with the latest data.
+8. Dashboard refreshes automatically.
 
 ---
 
 # 👤 Demo Credentials
 
-Username:
+Username
 
 ```
 admin
 ```
 
-Password:
+Password
 
 ```
 admin
@@ -333,54 +364,52 @@ admin
 
 # 📸 Screenshots
 
-### Sign-UP Page
+## Sign Up
 
-![Login](./frontend/src/assets/IMS-2.png)
+![Signup](./frontend/src/assets/IMS-2.png)
 
 ---
-### Login Page
+
+## Login
 
 ![Login](./frontend/src/assets/IMS-1.png)
 
 ---
-### Dashboard
+
+## Dashboard
 
 ![Dashboard](./frontend/src/assets/IMS-3.png)
 
 ---
 
-# 🌐 Live Demo
+# 🧪 Backend API Testing
 
-Frontend
-
-```
-https://your-frontend-url
-```
-
-Backend
+A complete Postman testing guide is included in this repository.
 
 ```
-https://your-backend-url
+Inventory_Management_System_Interviewer_Guide.pdf
 ```
 
-Health Check
+The guide contains:
 
-```
-https://your-backend-url/health
-```
+- Step-by-step API testing
+- Copy-paste URLs
+- Ready-to-use JSON payloads
+- JWT Authentication flow
+- Expected API responses
 
 ---
 
-# 🔮 Future Enhancements
+# 🚀 Future Enhancements
 
-- Role-Based Access Control (Admin/User)
-- Inventory Search & Filters
-- Export Transactions to CSV
-- Inventory Analytics Dashboard
-- Charts & Graphs
+- Role-Based Access Control
+- Product CRUD
+- Search & Filtering
+- Dashboard Charts
+- CSV Export
 - Docker Support
+- GitHub Actions CI/CD
 - Kubernetes Deployment
-- Email Notifications
 
 ---
 
@@ -396,10 +425,11 @@ This project demonstrates practical experience with:
 - JWT Authentication
 - REST APIs
 - FIFO Inventory Costing
+- Event-Driven Architecture
 - Database Transactions
 - Concurrent Data Processing
-- Clean Architecture
-- Production-Ready Project Structure
+- Production-Ready Backend Design
+- Cloud Deployment
 
 ---
 
