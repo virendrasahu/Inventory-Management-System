@@ -13,7 +13,7 @@ A production-ready **Inventory Management System** built for a small trading bus
 [https://inventory-management-system-191s.onrender.com](https://inventory-management-system-191s.onrender.com)
 
 ### Health Check
-https://YOUR-BACKEND-URL/health
+[https://inventory-management-system-191s.onrender.com/health](https://inventory-management-system-191s.onrender.com/health)
 
 ---
 
