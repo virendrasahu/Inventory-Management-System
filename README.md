@@ -1,7 +1,5 @@
 # Inventory Management System (FIFO)
 
-![Dashboard Screenshot](./frontend/src/assets/IMS-3.png)
-
 A fully working **Inventory Management System** for a small trading business that uses the **FIFO (First-In, First-Out)** costing method. The application processes purchase and sale events through **Apache Kafka**, stores inventory in **PostgreSQL**, and provides a **real-time React dashboard** to monitor inventory, transaction history, and costing.
 
 ---
@@ -335,27 +333,19 @@ admin
 
 # 📸 Screenshots
 
-### Login Page
+### Sign-UP Page
 
-![Login](./frontend/src/assets/login.png)
+![Login](./frontend/src/assets/IMS-2.png)
 
 ---
+### Login Page
 
+![Login](./frontend/src/assets/IMS-1.png)
+
+---
 ### Dashboard
 
 ![Dashboard](./frontend/src/assets/IMS-3.png)
-
----
-
-### Transaction Ledger
-
-![Ledger](./frontend/src/assets/ledger.png)
-
----
-
-### Kafka Event Simulator
-
-![Simulator](./frontend/src/assets/simulator.png)
 
 ---
 
