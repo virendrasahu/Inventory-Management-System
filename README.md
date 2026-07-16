@@ -19,7 +19,7 @@ A production-ready **Inventory Management System** built for a small trading bus
 
 ## 📂 GitHub Repository
 
-https://github.com/YOUR_USERNAME/YOUR_REPOSITORY
+[https://github.com/YOUR_USERNAME/YOUR_REPOSITORY](https://github.com/virendrasahu/Inventory-Management-System)
 
 ---
 
