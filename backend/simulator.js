@@ -3,7 +3,7 @@ const kafka = require('./src/kafka/config');
 
 
 const producer = kafka.producer();
-const TOPIC = 'inventory-events';
+const TOPIC = kafka.KAFKA_TOPIC;
 
 const run = async () => {
   await producer.connect();

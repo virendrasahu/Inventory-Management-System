@@ -1,10 +1,25 @@
+# Dependencies
 node_modules/
 backend/node_modules/
 frontend/node_modules/
+
+# Build output
 dist/
 build/
+
+# Environment files (keep the examples)
 .env
 .env.*
+!.env.example
+!**/.env.example
+
+# Certificates and keys
+*.pem
+*.key
+*.cert
+backend/ca.pem
+
+# Logs and OS/editor files
 *.log
 .DS_Store
 .vscode/

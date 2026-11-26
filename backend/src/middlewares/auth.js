@@ -1,7 +1,38 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const logger = require('../utils/logger');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-for-dev';
+const DEV_FALLBACK_SECRET = 'fallback-secret-for-dev';
+const MIN_PRODUCTION_JWT_SECRET_LENGTH = 32;
+
+const resolveJwtSecret = (env = process.env) => {
+  const nodeEnv = env.NODE_ENV;
+  const secret = env.JWT_SECRET;
+
+  if (nodeEnv === 'production') {
+    if (
+      !secret ||
+      typeof secret !== 'string' ||
+      secret.trim().length < MIN_PRODUCTION_JWT_SECRET_LENGTH
+    ) {
+      throw new Error(
+        `FATAL: JWT_SECRET must be set and at least ${MIN_PRODUCTION_JWT_SECRET_LENGTH} characters long when NODE_ENV is "production".`
+      );
+    }
+    return secret;
+  }
+
+  if (!secret) {
+    logger.warn(
+      'JWT_SECRET is not set; using fallback-secret-for-dev (allowed only when NODE_ENV is not "production").'
+    );
+    return DEV_FALLBACK_SECRET;
+  }
+
+  return secret;
+};
+
+const JWT_SECRET = resolveJwtSecret();
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -22,5 +53,8 @@ const verifyToken = (req, res, next) => {
 
 module.exports = {
   verifyToken,
-  JWT_SECRET
+  JWT_SECRET,
+  resolveJwtSecret,
+  DEV_FALLBACK_SECRET,
+  MIN_PRODUCTION_JWT_SECRET_LENGTH,
 };
