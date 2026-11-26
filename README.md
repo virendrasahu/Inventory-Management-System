@@ -20,6 +20,36 @@ An event-driven **Inventory Management System** using **FIFO (First-In, First-Ou
 *(Seeded locally with `npm run seed` in `backend/`, or register a new account on the Sign Up page.)*
 
 ---
+## 📸 Screenshots
+
+### Sign Up
+![Sign Up](docs/analysis/screenshots/SignUp.png)
+
+### Login
+![Login](docs/analysis/screenshots/SignIn.png)
+
+### Dashboard (Stock Overview, FIFO Ledger, Live Events)
+![Dashboard](docs/analysis/screenshots/WorkingProject.png)
+
+### Database (Neon PostgreSQL)
+
+**Products**
+![Products](docs/analysis/screenshots/Products.png)
+
+**Inventory Batches**
+![Inventory Batches](docs/analysis/screenshots/InventoryBatches.png)
+
+**Sales**
+![Sales](docs/analysis/screenshots/Sales.png)
+
+**Sale Batch Details (FIFO audit trail)**
+![Sale Batch Details](docs/analysis/screenshots/SaleBatchDetails.png)
+
+**Processed Events**
+![Processed Events](docs/analysis/screenshots/processedEvents.png)
+
+### Kafka (Aiven)
+![Kafka](docs/analysis/screenshots/Kafka.png)
 
 ## Architecture
 
