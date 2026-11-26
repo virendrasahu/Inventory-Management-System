@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/*.test.js",
     "start": "node index.js",
     "dev": "nodemon index.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run consumer\"",
     "migrate": "node migrate.js",
     "seed": "node seed.js",
-    "consumer": "node consumerWorker.js"
+    "consumer": "node consumerWorker.js",
+    "simulate": "node ../simulator/producer.js"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,8 @@
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "pg-mem": "^3.0.14",
+    "supertest": "^7.3.2"
   }
 }

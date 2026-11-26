@@ -1,0 +1,927 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-4789-abcd-0123456789ef",
+    "name": "Inventory Management System (FIFO)",
+    "description": "Postman Collection v2.1 for the Inventory Management System (FIFO) backend API.\n\nVariables:\n- {{baseUrl}}: Default http://localhost:3001 (Render URL: https://inventory-management-system-191s.onrender.com)\n- {{token}}: Automatically populated by the 'Login' request test script\n- {{username}}: Login username or email\n- {{password}}: Account password (do not commit real secrets)\n\nNote on Async Processing:\nPOST /api/event and POST /api/simulate publish to Kafka ('inventory-events'). A running Kafka consumer (npm run consumer / consumerWorker.js) must be active for events to appear in PostgreSQL (/api/stock and /api/ledger).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Checks backend liveness and PostgreSQL connectivity. Note: Currently hardcodes kafka_producer: 'connected' without checking actual Kafka connection."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has expected health fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status', 'healthy');",
+                  "    pm.expect(jsonData).to.have.property('db', 'connected');",
+                  "    pm.expect(jsonData).to.have.property('kafka_producer');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"{{testFullName}}\",\n  \"username\": \"qa_user_{{$timestamp}}\",\n  \"email\": \"qa_{{$timestamp}}@example.com\",\n  \"password\": \"TestPass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Registers a new user account. Uses {{$timestamp}} to avoid 409 conflicts on repeated runs."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('User created with expected fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', true);",
+                  "    pm.expect(jsonData).to.have.property('message', 'User registered successfully');",
+                  "    pm.expect(jsonData).to.have.property('user');",
+                  "    pm.expect(jsonData.user).to.have.property('id');",
+                  "    pm.expect(jsonData.user).to.have.property('username');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticates with username or email ('identifier') and password. Automatically stores the returned JWT in {{token}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response contains JWT token and user', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', true);",
+                  "    pm.expect(jsonData).to.have.property('token').that.is.a('string').and.not.empty;",
+                  "    pm.expect(jsonData).to.have.property('user');",
+                  "    pm.expect(jsonData.user).to.have.property('username');",
+                  "    pm.environment.set('token', jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "Get Product Stock Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "stock"
+              ]
+            },
+            "description": "Returns remaining quantity, total inventory cost, and average cost per unit per product."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array of stock items', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.property('product_id');",
+                  "        pm.expect(jsonData[0]).to.have.property('current_quantity');",
+                  "        pm.expect(jsonData[0]).to.have.property('total_inventory_cost');",
+                  "        pm.expect(jsonData[0]).to.have.property('average_cost_per_unit');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Transaction Ledger",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ledger"
+              ]
+            },
+            "description": "Returns unified time-series ledger of purchases and sales ordered by timestamp DESC."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is an array of ledger entries', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.property('id');",
+                  "        pm.expect(jsonData[0]).to.have.property('type');",
+                  "        pm.expect(jsonData[0]).to.have.property('product_id');",
+                  "        pm.expect(jsonData[0]).to.have.property('quantity');",
+                  "        pm.expect(jsonData[0]).to.have.property('total_value');",
+                  "        pm.expect(jsonData[0]).to.have.property('timestamp');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Push Single Inventory Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD004\",\n  \"event_type\": \"purchase\",\n  \"quantity\": 25,\n  \"unit_price\": 40.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            },
+            "description": "Pushes a single purchase or sale event to Kafka topic 'inventory-events'. Server overrides timestamp with current server UTC time."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Event accepted by Kafka producer', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', true);",
+                  "    pm.expect(jsonData).to.have.property('message', 'Event pushed to Kafka');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Simulate 5 Dummy Events",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/simulate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "simulate"
+              ]
+            },
+            "description": "Produces 5 hardcoded purchase/sale events (PRD001 and PRD002) to Kafka topic 'inventory-events'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Simulation succeeded', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', true);",
+                  "    pm.expect(jsonData).to.have.property('message', 'Simulated events sent to Kafka');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FIFO scenario",
+      "description": "Ordered end-to-end FIFO verification on a clean product (uses unique SKU PRD-TEST-<run> or PRD-TEST).\n\nIMPORTANT ASYNC NOTE:\nPOST /api/event publishes asynchronously to Kafka. Request #4 includes a 2.5s pre-request delay to let consumerWorker.js process the 3 Kafka messages into PostgreSQL. Ensure both the API server and consumerWorker.js are running (e.g. npm run dev:all) and PRD-TEST starts with 0 stock before running this folder.",
+      "item": [
+        {
+          "name": "1. Purchase PRD-TEST 50 @ 100",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD-TEST\",\n  \"event_type\": \"purchase\",\n  \"quantity\": 50,\n  \"unit_price\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ensure first purchase has an earlier timestamp than second purchase",
+                  "setTimeout(function () {}, 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Purchase 1 pushed', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('success', true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Purchase PRD-TEST 30 @ 120",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD-TEST\",\n  \"event_type\": \"purchase\",\n  \"quantity\": 30,\n  \"unit_price\": 120\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Small delay so timestamp ordering is strictly after batch 1",
+                  "setTimeout(function () {}, 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Purchase 2 pushed', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('success', true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Sale PRD-TEST 60 units",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD-TEST\",\n  \"event_type\": \"sale\",\n  \"quantity\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(function () {}, 200);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Sale pushed', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('success', true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Verify Stock (Remaining Qty = 20, Cost = 2400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "stock"
+              ]
+            },
+            "description": "Waits 2.5s before sending so async Kafka consumer commits FIFO transactions, then verifies PRD-TEST remaining_quantity = 20, total_inventory_cost = 2400, average_cost_per_unit = 120."
+          },
+          "event": [
+            {
+              "listen": "pre-request",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Wait for async Kafka consumer to process the 3 events",
+                  "setTimeout(function () {}, 2500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const stock = pm.response.json();",
+                  "const item = stock.find(s => s.product_id === 'PRD-TEST');",
+                  "pm.test('PRD-TEST exists in stock overview', function () {",
+                  "    pm.expect(item, 'PRD-TEST should be present after consumer processes Kafka events').to.not.be.undefined;",
+                  "});",
+                  "if (item) {",
+                  "    pm.test('Remaining quantity is 20', function () {",
+                  "        pm.expect(Number(item.current_quantity)).to.eql(20);",
+                  "    });",
+                  "    pm.test('Remaining inventory cost is 2400', function () {",
+                  "        pm.expect(Number(item.total_inventory_cost)).to.eql(2400);",
+                  "    });",
+                  "    pm.test('Average cost per unit is 120', function () {",
+                  "        pm.expect(Number(item.average_cost_per_unit)).to.eql(120);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Verify Ledger (Sale FIFO Cost = 6200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ledger"
+              ]
+            },
+            "description": "Verifies the latest sale for PRD-TEST (quantity 60) has FIFO total_value = 6200 (50*100 + 10*120)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const ledger = pm.response.json();",
+                  "const sale = ledger.find(tx => tx.product_id === 'PRD-TEST' && tx.type === 'sale' && Number(tx.quantity) === 60);",
+                  "pm.test('PRD-TEST sale of 60 units recorded in ledger', function () {",
+                  "    pm.expect(sale).to.not.be.undefined;",
+                  "});",
+                  "if (sale) {",
+                  "    pm.test('FIFO sale cost equals 6200', function () {",
+                  "        pm.expect(Number(sale.total_value)).to.eql(6200);",
+                  "    });",
+                  "    pm.test('Sale unit price is null in ledger', function () {",
+                  "        pm.expect(sale.price).to.be.null;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Negative Tests",
+      "item": [
+        {
+          "name": "Sale Exceeding Available Stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD-NEG-STOCK\",\n  \"event_type\": \"sale\",\n  \"quantity\": 999999\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            },
+            "description": "Verifies POST /api/event rejects a sale when available stock is insufficient (or product does not exist) with HTTP 409 Conflict and available_quantity."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 409 Conflict (Insufficient stock)', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Response contains Insufficient stock message and available_quantity', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', false);",
+                  "    pm.expect(jsonData).to.have.property('message', 'Insufficient stock');",
+                  "    pm.expect(jsonData).to.have.property('available_quantity').that.is.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid event_type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD001\",\n  \"event_type\": \"adjustment\",\n  \"quantity\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            },
+            "description": "Verifies POST /api/event rejects unsupported event_type values with HTTP 400 Bad Request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Validation error structure returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', false);",
+                  "    pm.expect(jsonData).to.have.property('message').that.is.a('string');",
+                  "    pm.expect(jsonData).to.have.property('errors').that.is.an('array').and.not.empty;",
+                  "    pm.expect(jsonData.errors.some(e => e.field === 'event_type')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing product_id",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_type\": \"purchase\",\n  \"quantity\": 10,\n  \"unit_price\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Validation error identifies product_id', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', false);",
+                  "    pm.expect(jsonData).to.have.property('message').that.is.a('string');",
+                  "    pm.expect(jsonData).to.have.property('errors').that.is.an('array').and.not.empty;",
+                  "    pm.expect(jsonData.errors.some(e => e.field === 'product_id')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative quantity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD001\",\n  \"event_type\": \"purchase\",\n  \"quantity\": -10,\n  \"unit_price\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            },
+            "description": "Verifies POST /api/event rejects negative quantities with HTTP 400 Bad Request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Validation error identifies quantity', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', false);",
+                  "    pm.expect(jsonData).to.have.property('message').that.is.a('string');",
+                  "    pm.expect(jsonData).to.have.property('errors').that.is.an('array').and.not.empty;",
+                  "    pm.expect(jsonData.errors.some(e => e.field === 'quantity')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Purchase Without unit_price (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"PRD001\",\n  \"event_type\": \"purchase\",\n  \"quantity\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/event",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "event"
+              ]
+            },
+            "description": "Verifies purchase events require unit_price > 0 and return HTTP 400 otherwise."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('Validation error identifies unit_price', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', false);",
+                  "    pm.expect(jsonData).to.have.property('errors').that.is.an('array').and.not.empty;",
+                  "    pm.expect(jsonData.errors.some(e => e.field === 'unit_price')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protected Route Without Token (401)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "stock"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Response contains access denied error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('error', 'Access denied. No token provided.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login With Wrong Password (401)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{username}}\",\n  \"password\": \"definitely-wrong-password-123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Response indicates invalid credentials', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success', false);",
+                  "    pm.expect(jsonData).to.have.property('message', 'Invalid credentials');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { LogOut, Zap, Package, ArrowUpDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const getApiErrorMessage = (err, fallback) => {
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+
+  if (status === 400) {
+    if (Array.isArray(data?.errors) && data.errors.length > 0) {
+      return data.errors.map((e) => e.message || e.msg).filter(Boolean).join('; ');
+    }
+    return data?.message || data?.error || 'Invalid event input.';
+  }
+
+  if (status === 409) {
+    const base = data?.message || 'Insufficient stock';
+    if (data?.available_quantity !== undefined) {
+      return `${base} (Available: ${data.available_quantity})`;
+    }
+    return base;
+  }
+
+  if (status === 503) {
+    return data?.message || 'Kafka service is temporarily unavailable.';
+  }
+
+  return data?.message || data?.error || fallback;
+};
 
 export default function Dashboard() {
   const { token, user, logout } = useAuth();
@@ -11,6 +38,7 @@ export default function Dashboard() {
   const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pushingEvent, setPushingEvent] = useState(false);
+  const refreshTimerRef = useRef(null);
   
   const [formData, setFormData] = useState({
     product_id: '',
@@ -19,16 +47,22 @@ export default function Dashboard() {
     unit_price: ''
   });
 
-  const getAuthHeaders = () => {
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
+  const handleLogout = useCallback(() => {
+    logout();
+  }, [logout]);
 
-  const fetchData = async () => {
+  const getAuthHeaders = useCallback(() => {
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }, [token]);
+
+  const fetchData = useCallback(async () => {
+    if (!token) return;
     try {
-      const stockRes = await axios.get(`${API_URL}/api/stock`, getAuthHeaders());
+      const [stockRes, ledgerRes] = await Promise.all([
+        axios.get(`${API_URL}/api/stock`, getAuthHeaders()),
+        axios.get(`${API_URL}/api/ledger`, getAuthHeaders()),
+      ]);
       setStock(stockRes.data);
-      
-      const ledgerRes = await axios.get(`${API_URL}/api/ledger`, getAuthHeaders());
       setLedger(ledgerRes.data);
     } catch (err) {
       console.error('Error fetching data', err);
@@ -36,26 +70,47 @@ export default function Dashboard() {
         handleLogout();
       }
     }
-  };
+  }, [token, getAuthHeaders, handleLogout]);
+
+  const scheduleFollowUpRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      fetchData();
+    }, 1000);
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [fetchData]);
 
   const handleSimulate = async () => {
     setLoading(true);
     try {
       await axios.post(`${API_URL}/api/simulate`, {}, getAuthHeaders());
-      setTimeout(fetchData, 1000);
+      toast.success('Simulated events sent to Kafka');
+      await fetchData();
+      scheduleFollowUpRefresh();
     } catch (err) {
       console.error('Error simulating events', err);
       if (err.response?.status === 401) {
         handleLogout();
+      } else {
+        toast.error(getApiErrorMessage(err, 'Failed to simulate events'));
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
   
   const handlePushEvent = async (e) => {
@@ -65,23 +120,24 @@ export default function Dashboard() {
       await axios.post(`${API_URL}/api/event`, {
         product_id: formData.product_id,
         event_type: formData.event_type.toLowerCase(),
-        quantity: formData.quantity,
-        unit_price: formData.event_type === 'Purchase' ? formData.unit_price : undefined
+        quantity: Number(formData.quantity),
+        unit_price: formData.event_type === 'Purchase' ? Number(formData.unit_price) : undefined
       }, getAuthHeaders());
       
+      toast.success('Event pushed to Kafka');
       setFormData({ product_id: '', event_type: 'Sale', quantity: '', unit_price: '' });
-      setTimeout(fetchData, 1000);
+      await fetchData();
+      scheduleFollowUpRefresh();
     } catch (err) {
       console.error('Error pushing event', err);
       if (err.response?.status === 401) {
         handleLogout();
+      } else {
+        toast.error(getApiErrorMessage(err, 'Failed to push event'));
       }
+    } finally {
+      setPushingEvent(false);
     }
-    setPushingEvent(false);
-  };
-
-  const handleLogout = () => {
-    logout();
   };
 
   const formatCurrency = (val) => {
@@ -202,8 +258,8 @@ export default function Dashboard() {
                   <input 
                     required
                     type="number"
-                    step="0.01"
-                    min="0"
+                    step="any"
+                    min="0.0001"
                     value={formData.unit_price}
                     onChange={(e) => setFormData({...formData, unit_price: e.target.value})}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 min-h-[44px]"
@@ -281,7 +337,7 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {ledger.map((tx) => (
-                  <tr key={tx.id + tx.type} className="hover:bg-slate-50 transition-colors">
+                  <tr key={`${tx.type}-${tx.id}`} className="hover:bg-slate-50 transition-colors">
                     <td className="py-4 px-4 text-slate-500">{new Date(tx.timestamp).toLocaleString()}</td>
                     <td className="py-4 px-4 font-semibold text-slate-900">{tx.product_id}</td>
                     <td className="py-4 px-4">
