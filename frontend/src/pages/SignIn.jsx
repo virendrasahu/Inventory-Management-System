@@ -74,12 +74,12 @@ export default function SignIn() {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-slate-500">
+          {/* <div className="mt-6 text-center text-sm text-slate-500">
             Don't have an account?{' '}
             <Link to="/signup" className="text-slate-900 font-medium hover:underline">
               Create Account
             </Link>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
