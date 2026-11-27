@@ -29,10 +29,10 @@ function AppContent() {
           path="/signin" 
           element={<PublicRoute><SignIn /></PublicRoute>} 
         />
-        <Route 
+        {/* <Route 
           path="/signup" 
           element={<PublicRoute><SignUp /></PublicRoute>} 
-        />
+        /> */}
         <Route 
           path="/dashboard" 
           element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
